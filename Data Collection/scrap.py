@@ -5,6 +5,8 @@ from datetime import datetime
 import os
 import calendar
 from colorama import Fore, Style, init
+from selenium.webdriver.firefox.options import Options
+
 
 # Initialize colorama
 init(autoreset=True)
@@ -13,7 +15,6 @@ BASE_URL = "https://economictimes.indiatimes.com/archivelist"
 
 month = 1
 
-
 # sep, apr, june, nov = 30
 dateMonthMap = [-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
@@ -21,8 +22,14 @@ dateMonthMap = [-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 def getDataForYear(year, startMonthIndex, endMonthIndex, index):
     filename = "data.csv"
 
+    # options for headlesss so that we dont need to install firefox
+    options = Options()
+    options.add_argument("--headless")
+
     try:
-        driver = webdriver.Firefox()
+        driver = webdriver.Firefox(
+            options = options
+        )
 
         if(year % 4 == 0):
                 dateMonthMap[2] = 29
