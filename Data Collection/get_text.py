@@ -9,6 +9,7 @@ link = "https://economictimes.indiatimes.com/news/india/asi-seeks-shahi-jama-mas
 
 def getNewsTextFromLink(link):
     try:
+        
         driver = webdriver.Firefox()
         print(f"{Fore.CYAN}Fetching data from: {link}{Style.RESET_ALL}")
 
