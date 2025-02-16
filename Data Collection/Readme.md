@@ -1,6 +1,6 @@
 place the firefox driver to the path in your windows
 
-'''bash
+''' 
 geckodriver.exe place it in to the path so that it can be accessed from anywhere
 
 
