@@ -14,13 +14,13 @@ init(autoreset=True)
 # Global Constants
 INPUT_FILE = "data.csv"
 OUTPUT_FILE = "ET_data.csv"
-NUM_PROCESSES = max(2, cpu_count() - 1)  # Use all but 1 CPU core
+NUM_PROCESSES = max(2, cpu_count() - 1)  
 
 
 def init_driver():
     """Initialize and return a new Selenium WebDriver instance."""
     options = Options()
-    options.add_argument("--headless")  # Run in headless mode (no GUI)
+    options.add_argument("--headless") 
     options.set_preference("intl.accept_languages", "en,en-US")
 
     driver = webdriver.Firefox(options=options)
