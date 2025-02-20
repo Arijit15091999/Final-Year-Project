@@ -12,5 +12,5 @@ if __name__ == "__main__":
     # )
 
     # getNewsFromLink()
-    # scrape_news()
-    print(cpu_count())
+    print(f"CPU COUNT = {cpu_count()}")
+    scrape_news()
