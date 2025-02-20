@@ -1,13 +1,14 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException, WebDriverException
 from multiprocessing import Pool, cpu_count
 from colorama import Fore, Style, init
 import pandas as pd
 import os
 import time
 from urllib3.exceptions import ReadTimeoutError
+from concurrent.futures import ProcessPoolExecutor
 
 init(autoreset=True)
 
@@ -22,7 +23,7 @@ def init_driver():
     options = Options()
     options.add_argument("--headless") 
     options.set_preference("intl.accept_languages", "en,en-US")
-
+    
     driver = webdriver.Firefox(options=options)
     driver.set_page_load_timeout(180)
     return driver
@@ -59,8 +60,16 @@ def fetch_article_text(link):
         except ReadTimeoutError:
             print(f"{Fore.RED}Read Timeout on {link}, skipping...{Style.RESET_ALL}")
             time.sleep(3)
+        except KeyboardInterrupt:
+            print(f"{Fore.RED}Script stopped manually. Closing WebDriver.{Style.RESET_ALL}")
+            driver.quit()
+        except StaleElementReferenceException:
+            print(f"{Fore.YELLOW} Stale Element error: Element reference lost")
 
-    driver.quit()
+    try:
+        driver.quit()
+    except WebDriverException:
+        print(f"{Fore.YELLOW} Driver is already closed{Style.RESET_ALL}")
 
     return link, "Not Found"
 
@@ -69,7 +78,7 @@ def process_links_in_parallel(links):
     """Process multiple links in parallel using multiprocessing."""
     print(f"{Fore.CYAN}🔹 Using {NUM_PROCESSES} parallel processes...{Style.RESET_ALL}")
 
-    with Pool(NUM_PROCESSES) as pool:
+    with ProcessPoolExecutor(NUM_PROCESSES) as pool:
         results = pool.map(fetch_article_text, links)  # Parallel execution
 
     return results
@@ -90,7 +99,7 @@ def scrape_news():
     links = df["Link"].tolist()
 
     # Split into batches to avoid excessive memory usage
-    batch_size = 500  # Adjust based on system performance
+    batch_size = 500
     total_batches = (len(links) // batch_size) + 1
 
     all_results = []
@@ -102,7 +111,7 @@ def scrape_news():
         results = process_links_in_parallel(batch_links)
         all_results.extend(results)
 
-        # Save intermediate results to avoid data loss
+        # Save intermediate results 
         temp_df = pd.DataFrame(all_results, columns=["Link", "Text"])
         temp_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
 
