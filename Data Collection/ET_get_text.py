@@ -11,7 +11,7 @@ init(autoreset=True)
 
 # link = "https://economictimes.indiatimes.com/markets/stocks/news/stock-picks-of-the-week-4-stocks-with-consistent-score-improvement-and-upside-potential-of-up-to-27/articleshow/106442323.cms"
 
-def getNewsTextFromLinkHelper(link, retryCount = 3, driver):
+def getNewsTextFromLinkHelper(link, driver, retryCount = 3):
     data = "Not Found"
 
     for attempt in range(retryCount):
@@ -124,7 +124,7 @@ def getNewsFromLink():
         texts.append(getNewsTextFromLinkHelper(link = link, driver = driver))
 
     driver.quit()
-    
+
     # print(len(texts))
 
     # dataFrame["Text"] = texts
