@@ -9,6 +9,8 @@ import os
 import time
 from urllib3.exceptions import ReadTimeoutError
 from concurrent.futures import ProcessPoolExecutor
+from selenium.webdriver.firefox.service import Service
+import warnings
 
 init(autoreset=True)
 
@@ -23,9 +25,21 @@ def init_driver():
     options = Options()
     options.add_argument("--headless") 
     options.set_preference("intl.accept_languages", "en,en-US")
-    
+
+    # service = Service(
+    #     executable_path= "../geckodriver-v0.36.0-win32/geckodriver.exe",
+    #     log_output="geckodriver.log"
+    # )
+
+    # service = Service(log_output = 'nul', executable_path="./geckodriver.exe")
+
+    # print(service.DRIVER_PATH_ENV_KEY)
+
     driver = webdriver.Firefox(options=options)
     driver.set_page_load_timeout(180)
+
+    warnings.simplefilter("ignore")
+
     return driver
 
 
@@ -67,7 +81,8 @@ def fetch_article_text(link):
             print(f"{Fore.YELLOW} Stale Element error: Element reference lost")
 
     try:
-        driver.quit()
+        if driver:
+            driver.quit()
     except WebDriverException:
         print(f"{Fore.YELLOW} Driver is already closed{Style.RESET_ALL}")
 
@@ -79,7 +94,7 @@ def process_links_in_parallel(links):
     print(f"{Fore.CYAN}🔹 Using {NUM_PROCESSES} parallel processes...{Style.RESET_ALL}")
 
     with ProcessPoolExecutor(NUM_PROCESSES) as pool:
-        results = pool.map(fetch_article_text, links)  # Parallel execution
+        results = list(pool.map(fetch_article_text, links))  # Parallel execution
 
     return results
 
@@ -108,7 +123,7 @@ def scrape_news():
         batch_links = links[i * batch_size : (i + 1) * batch_size]
         print(f"{Fore.YELLOW}📌 Processing batch {i + 1}/{total_batches} ({len(batch_links)} links){Style.RESET_ALL}")
 
-        results = process_links_in_parallel(batch_links)
+        results = process_links_in_parallel(batch_links)[0]
         all_results.extend(results)
 
         # Save intermediate results 
