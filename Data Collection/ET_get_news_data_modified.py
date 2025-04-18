@@ -40,6 +40,7 @@ def init_driver():
     warnings.simplefilter("ignore")
     return driver
 
+
 def kill_process_tree(pid):
     parent = psutil.Process(pid)
 
@@ -49,7 +50,6 @@ def kill_process_tree(pid):
         parent.kill()
     except Exception as e:
         print(f"{Fore.RED} failed to kill the process_tree{Style.RESET_ALL}")
-
 
 
 def fetch_article_text(link):
@@ -91,7 +91,7 @@ def fetch_article_text(link):
         kill_all_instances_of_firefox_and_geckodriver()
     except Exception as e:
         print(f"{Fore.RED} Unexpected error: {e} {Style.RESET_ALL}")
-        
+
     finally:
         if driver:
             try:
@@ -160,6 +160,7 @@ def scrape_news():
 
     kill_all_instances_of_firefox_and_geckodriver()
 
+
 def kill_all_instances_of_firefox_and_geckodriver():
     current_os = platform.system().lower()
 
@@ -177,7 +178,6 @@ def kill_all_instances_of_firefox_and_geckodriver():
             print(f"{Fore.RED} OS not supported {Style.RESET_ALL}")
     except subprocess.CalledProcessError as e:
         print(f"{Fore.RED}Command failed: {e}{Style.RESET_ALL}")
-
 
 # Run the scraper
 # if __name__ == "__main__":
