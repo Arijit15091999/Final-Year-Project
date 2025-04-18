@@ -5,6 +5,7 @@ from selenium.common.exceptions import (NoSuchElementException, TimeoutException
                                         StaleElementReferenceException, WebDriverException,
                                         InvalidSessionIdException)
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
 from colorama import Fore, Style, init
 import pandas as pd
 import os
@@ -12,6 +13,9 @@ import time
 from urllib3.exceptions import ReadTimeoutError
 from selenium.webdriver.firefox.service import Service
 import warnings
+import psutil
+import platform
+import subprocess
 
 init(autoreset=True)
 
@@ -36,10 +40,22 @@ def init_driver():
     warnings.simplefilter("ignore")
     return driver
 
+def kill_process_tree(pid):
+    parent = psutil.Process(pid)
+
+    try:
+        for child in parent.children:
+            child.kill()
+        parent.kill()
+    except Exception as e:
+        print(f"{Fore.RED} failed to kill the process_tree{Style.RESET_ALL}")
+
+
 
 def fetch_article_text(link):
     """Fetch article text from a given link using Selenium."""
     driver = None
+    text = None
     try:
         driver = init_driver()
         for attempt in range(3):  # Retry up to 3 times
@@ -60,39 +76,39 @@ def fetch_article_text(link):
                 article_text = article_element.text.strip()
 
                 if article_text:
-                    return link, article_text  # Successful fetch
+                    text = article_text  # Successful fetch
 
             except (NoSuchElementException, TimeoutException):
                 print(f"{Fore.RED}❌ Error: Article not found on {link}, retrying...{Style.RESET_ALL}")
                 time.sleep(2)
             except ReadTimeoutError:
                 print(f"{Fore.RED}Read Timeout on {link}, skipping...{Style.RESET_ALL}")
-                return link, "Read Timeout"
             except StaleElementReferenceException:
                 print(f"{Fore.YELLOW} Stale Element error: Retrying... {Style.RESET_ALL}")
             except WebDriverException as e:
                 print(f"{Fore.RED} WebDriver error: {e} {Style.RESET_ALL}")
-                return link, "WebDriver Error"
-
+    except KeyboardInterrupt:
+        kill_all_instances_of_firefox_and_geckodriver()
     except Exception as e:
         print(f"{Fore.RED} Unexpected error: {e} {Style.RESET_ALL}")
-        return link, "Unexpected Error"
-
+        
     finally:
         if driver:
             try:
                 driver.quit()
             except InvalidSessionIdException:
                 print(f"{Fore.YELLOW} Driver already closed {Style.RESET_ALL}")
+            except Exception as e:
+                kill_process_tree(driver.service.process.pid)
 
-    return link, "Not Found"
+    return link, text
 
 
 def process_links_in_parallel(links):
     """Process multiple links in parallel using threads."""
     print(f"{Fore.CYAN}🔹 Using {NUM_PROCESSES} parallel threads...{Style.RESET_ALL}")
 
-    with ThreadPoolExecutor(NUM_PROCESSES) as executor:
+    with Pool(NUM_PROCESSES) as executor:
         results = list(executor.map(fetch_article_text, links))
 
     return results
@@ -141,6 +157,27 @@ def scrape_news():
         temp_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
 
     print(f"{Fore.GREEN}✔️ Scraping complete! Data saved to '{OUTPUT_FILE}'{Style.RESET_ALL}")
+
+    kill_all_instances_of_firefox_and_geckodriver()
+
+def kill_all_instances_of_firefox_and_geckodriver():
+    current_os = platform.system().lower()
+
+    try:
+        if current_os == "windows":
+            subprocess.run("cmd", "/c", "taskkill /F /IM firefox.exe")
+            subprocess.run("cmd", "/c", "taskkill /F /IM geckodriver.exe")
+            print(f"{Fore.GREEN} Ran Windows commands. {Style.RESET_ALL}")
+
+        elif current_os == "linux" or current_os == "darwin":
+            subprocess.run("pkill -f firefox", shell=True, check=True)
+            subprocess.run("pkill -f geckodriver", shell=True, check=True)
+            print(f"{Fore.GREEN} Ran Unix commands. {Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED} OS not supported {Style.RESET_ALL}")
+    except subprocess.CalledProcessError as e:
+        print(f"{Fore.RED}Command failed: {e}{Style.RESET_ALL}")
+
 
 # Run the scraper
 # if __name__ == "__main__":
