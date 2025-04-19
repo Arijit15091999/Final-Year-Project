@@ -21,6 +21,5 @@ if __name__ == "__main__":
         else:
             index = index + 365
 
-    # getNewsFromLink()
     # print(f"CPU COUNT = {cpu_count()}")
     # scrape_news()

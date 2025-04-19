@@ -22,7 +22,7 @@ init(autoreset=True)
 # Global Constants
 INPUT_FILE = "data.csv"
 OUTPUT_FILE = "ET_data.csv"
-NUM_PROCESSES = min(4, os.cpu_count() - 1)
+NUM_PROCESSES = min(6, os.cpu_count() - 1)
 
 
 def init_driver():
@@ -55,7 +55,7 @@ def kill_process_tree(pid):
 def fetch_article_text(link):
     """Fetch article text from a given link using Selenium."""
     driver = None
-    text = None
+    text = "Not Found"
     try:
         driver = init_driver()
         for attempt in range(3):  # Retry up to 3 times
@@ -77,31 +77,42 @@ def fetch_article_text(link):
 
                 if article_text:
                     text = article_text  # Successful fetch
+                    kill_driver(driver)
+                    return link, text
 
             except (NoSuchElementException, TimeoutException):
                 print(f"{Fore.RED}❌ Error: Article not found on {link}, retrying...{Style.RESET_ALL}")
                 time.sleep(2)
             except ReadTimeoutError:
                 print(f"{Fore.RED}Read Timeout on {link}, skipping...{Style.RESET_ALL}")
+                kill_driver(driver)
+                return link, "Not Found"
             except StaleElementReferenceException:
                 print(f"{Fore.YELLOW} Stale Element error: Retrying... {Style.RESET_ALL}")
+                time.sleep(2)
             except WebDriverException as e:
                 print(f"{Fore.RED} WebDriver error: {e} {Style.RESET_ALL}")
+                kill_driver(driver)
+                return link, "Not Found"
     except KeyboardInterrupt:
         kill_all_instances_of_firefox_and_geckodriver()
     except Exception as e:
         print(f"{Fore.RED} Unexpected error: {e} {Style.RESET_ALL}")
-
+        
     finally:
-        if driver:
-            try:
-                driver.quit()
-            except InvalidSessionIdException:
-                print(f"{Fore.YELLOW} Driver already closed {Style.RESET_ALL}")
-            except Exception as e:
-                kill_process_tree(driver.service.process.pid)
+        kill_driver(driver=driver)
 
     return link, text
+
+def kill_driver(driver):
+    if driver:
+        try:
+            driver.quit()
+        except InvalidSessionIdException:
+            print(f"{Fore.YELLOW} Driver already closed {Style.RESET_ALL}")
+        except Exception as e:
+            kill_process_tree(driver.service.process.pid)
+
 
 
 def process_links_in_parallel(links):
