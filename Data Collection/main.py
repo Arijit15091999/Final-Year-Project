@@ -2,6 +2,7 @@ from ET_data_scrap import getDataForYear
 from ET_get_text import getNewsFromLink
 from Bs4_article_scrape import scrape_news
 from multiprocessing import cpu_count
+from get_mw4me_news import get_article_info 
 
 if __name__ == "__main__":
     # index = 39448
@@ -21,5 +22,8 @@ if __name__ == "__main__":
     #     else:
     #         index = index + 365
 
-    print(f"CPU COUNT = {cpu_count()}")
-    scrape_news()
+    # print(f"CPU COUNT = {cpu_count()}")
+    # scrape_news()
+    
+    
+    get_article_info()
