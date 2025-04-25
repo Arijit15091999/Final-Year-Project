@@ -2,28 +2,18 @@ from ET_data_scrap import getDataForYear
 from ET_get_text import getNewsFromLink
 from Bs4_article_scrape import scrape_news
 from multiprocessing import cpu_count
-from get_mw4me_news import get_article_info 
+from get_mw4me_news import get_article_info, kill_all_instances_of_firefox_and_geckodriver
+from colorama import Style, Fore
 
 if __name__ == "__main__":
-    # index = 39448
-    # start_year = 2008
-    # end_year = 2022
-    
-    # for year in range(start_year, end_year + 1):
-    #     getDataForYear(
-    #         year = year,
-    #         startMonthIndex=1,
-    #         endMonthIndex=12,
-    #         index=index
-    #     )
+    try:
+        # Start with a clean slate
+        kill_all_instances_of_firefox_and_geckodriver()
         
-    #     if(year % 4 == 0):
-    #         index = index + 366
-    #     else:
-    #         index = index + 365
-
-    # print(f"CPU COUNT = {cpu_count()}")
-    # scrape_news()
-    
-    
-    get_article_info()
+        # Run the scraper
+        get_article_info()
+    except KeyboardInterrupt:
+        print(f"{Fore.YELLOW}\nScript interrupted by user{Style.RESET_ALL}")
+    finally:
+        kill_all_instances_of_firefox_and_geckodriver()
+        print(f"{Fore.GREEN}Script completed. All browser instances cleaned up.{Style.RESET_ALL}")

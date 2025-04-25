@@ -1,188 +1,196 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import InvalidSessionIdException
+from selenium.common.exceptions import InvalidSessionIdException, TimeoutException
 from colorama import Fore, Style, init
 import pandas as pd
-import numpy as np
 import os
 import platform
-import subprocess
 import psutil
+import time
+from contextlib import contextmanager
+
+# Initialize colorama
+init()
 
 # Global variables
 FILE_PATH = "data.csv"
+MAX_RETRIES = 3
+PAGE_LOAD_TIMEOUT = 30
+DELAY_BETWEEN_REQUESTS = 2  # seconds
 
 year_page_map = {
-    "2025" : 1263,
-    "2024" : 4113,
-    "2023" : 3857,
-    "2022" : 3694,
-    "2021" : 2295,
-    "2020" : 1268,
-    "2019" : 1877,
-    '2018' : 1777,
-    '2017' : 1858,
-    '2016' : 2071,
-    '2015' : 1970,
-    '2014' : 1978,
-    '2013' : 1601,
-    '2012' : 1323,
-    '2011' : 394
+    "2025": 1263,
+    "2024": 4113,
+    "2023": 3857,
+    "2022": 3694,
+    "2021": 2295,
+    "2020": 1268,
+    "2019": 1877,
+    '2018': 1777,
+    '2017': 1858,
+    '2016': 2071,
+    '2015': 1970,
+    '2014': 1978,
+    '2013': 1601,
+    '2012': 1323,
+    '2011': 394
 }
 
+@contextmanager
+def selenium_driver(options):
+    driver = webdriver.Firefox(options=options)
+    try:
+        yield driver
+    finally:
+        kill_driver(driver)
+
 def process_date(date_string):
-    arr = date_string.split('-')
-    arr.reverse()
-    
-    return "-".join(arr)
+    try:
+        arr = date_string.split('-')
+        arr.reverse()
+        return "-".join(arr)
+    except Exception as e:
+        print(f"{Fore.YELLOW}Date processing error: {e} for date {date_string}{Style.RESET_ALL}")
+        return date_string  # Return original if processing fails
 
 def store_data_into_csv(file_name, data):    
-    dataframe = pd.DataFrame(
-        data = data,
-        columns = [
-            "Datetime",
-            "News",
-            "Link"
-        ]
-    )
-    
-    dataframe.to_csv(
-        path_or_buf = file_name,
-        mode = 'a',
-        index=False,
-        encoding='utf-8',
-        header = not os.path.isfile(file_name)
-    )
-    
+    try:
+        dataframe = pd.DataFrame(
+            data=data,
+            columns=["Datetime", "News", "Link"]
+        )
+        
+        dataframe.to_csv(
+            path_or_buf=file_name,
+            mode='a',
+            index=False,
+            encoding='utf-8',
+            header=not os.path.isfile(file_name)
+        )
+    except Exception as e:
+        print(f"{Fore.RED}Error saving to CSV: {e}{Style.RESET_ALL}")
 
 def get_article_info():
-    for year in range(2011, 2026):
-        get_article_by_year(str(year))
+    try:
+        for page in range(961,year_page_map['2015']):
+            result = get_article_by_year_and_page_number(2015, page + 1)
+            if result:
+                store_data_into_csv(FILE_PATH, result)
+            time.sleep(DELAY_BETWEEN_REQUESTS)  # Delay between pages
+
+        for year in range(2016, 2026):
+            print(f"{Fore.BLUE}Processing year: {year}{Style.RESET_ALL}")
+            get_article_by_year(str(year))
+            time.sleep(DELAY_BETWEEN_REQUESTS)  # Be polite to the server
+    except KeyboardInterrupt:
+        print(f"{Fore.YELLOW}Process interrupted by user{Style.RESET_ALL}")
+    finally:
+        kill_all_instances_of_firefox_and_geckodriver()
 
 def get_article_by_year(year):
-    number_of_pages = year_page_map[year]
+    if year not in year_page_map:
+        print(f"{Fore.RED}Year {year} not in page map{Style.RESET_ALL}")
+        return
     
-    # print(number_of_pages)
-    all_results = []
+    number_of_pages = year_page_map[year]
+    print(f"{Fore.CYAN}Found {number_of_pages} pages for year {year}{Style.RESET_ALL}")
     
     for page in range(number_of_pages):
         result = get_article_by_year_and_page_number(year, page + 1)
-        store_data_into_csv(
-            file_name = FILE_PATH,
-            data = result
-        )    
+        if result:
+            store_data_into_csv(FILE_PATH, result)
+        time.sleep(DELAY_BETWEEN_REQUESTS)  # Delay between pages
+
+def get_article_by_year_and_page_number(year, page):
+    options = Options()
+    options.add_argument("--headless")
+    options.set_capability("pageLoadStrategy", "normal")
     
-def get_article_by_year_and_page_number(year,page):
-    try:
-        # Configure Firefox options
-        options = Options()
-        options.add_argument("--headless")
-        
-        # Set page load timeout
-        options.set_capability("pageLoadStrategy", "normal")
-
-        # init driver
-        driver = webdriver.Firefox(options = options)
-        driver.set_page_load_timeout(30)
-        
-        url = f"https://www.moneyworks4me.com/indianstocks/sectors-news-archives?year={year}&page={page}"
-
-        print(f"{Fore.GREEN}Fetching data from {url} {Style.RESET_ALL}")
-        
-        driver.get(
-            url = url
-        )
-
-        # print(driver.title)
-        
-        div_element = driver.find_element(
-            by = By.CSS_SELECTOR,
-            value = "div#main-company-content"
-        )
-        
-        li_element_for_news = div_element.find_elements(
-            by = By.TAG_NAME, 
-            value = 'li'
-        )
-        
-        all_results = []
-        
-        for li in li_element_for_news:
-            anchor = li.find_element(
-                by = By.TAG_NAME,
-                value = 'a'
-            )
-            news_heading = anchor.text
-            news_link = anchor.get_attribute(
-                name = 'href'
-            )
-            
-            date = li.find_element(
-                by = By.CSS_SELECTOR,
-                value = "div>div"
-            ).text
-            
-            # print(date)
-            # print(news_heading)
-            # print(news_link)
-            
-            date = process_date(date)
-            
-            print(f"{Fore.CYAN}Data Found date = {date}, heading = {news_heading} {url} {Style.RESET_ALL}")
-            
-            all_results.append(
-                (date, news_heading, news_link)
-            )
-    except KeyboardInterrupt:
-        kill_driver(driver = driver)
-    except Exception as e:
-        print(f"{Fore.RED}Exception occured {e} {Style.RESET_ALL}")
-    finally:
-        kill_driver(driver=driver)
-        
-    return all_results
+    all_results = []
+    url = f"https://www.moneyworks4me.com/indianstocks/sectors-news-archives?year={year}&page={page}"
     
+    for attempt in range(MAX_RETRIES):
+        try:
+            with selenium_driver(options) as driver:
+                driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+                print(f"{Fore.GREEN}Fetching data (attempt {attempt + 1}) from {url}{Style.RESET_ALL}")
+                
+                driver.get(url=url)
+                
+                div_element = driver.find_element(
+                    by=By.CSS_SELECTOR,
+                    value="div#main-company-content"
+                )
+                
+                li_elements = div_element.find_elements(by=By.TAG_NAME, value='li')
+                
+                for li in li_elements:
+                    try:
+                        anchor = li.find_element(by=By.TAG_NAME, value='a')
+                        news_heading = anchor.text
+                        news_link = anchor.get_attribute(name='href')
+                        
+                        date = li.find_element(
+                            by=By.CSS_SELECTOR,
+                            value="div>div"
+                        ).text
+                        
+                        date = process_date(date)
+                        
+                        print(f"{Fore.CYAN}Found: {date} | {news_heading[:50]}...{Style.RESET_ALL}")
+                        
+                        all_results.append((date, news_heading, news_link))
+                    except Exception as e:
+                        print(f"{Fore.YELLOW}Error processing article: {e}{Style.RESET_ALL}")
+                
+                return all_results  # Return if successful
+            
+        except TimeoutException:
+            if attempt < MAX_RETRIES - 1:
+                print(f"{Fore.YELLOW}Timeout, retrying... ({attempt + 1}/{MAX_RETRIES}){Style.RESET_ALL}")
+                time.sleep(5)
+                continue
+            print(f"{Fore.RED}Max retries reached for {url}{Style.RESET_ALL}")
+            return []
+        except Exception as e:
+            print(f"{Fore.RED}Error: {type(e).__name__} - {str(e)}{Style.RESET_ALL}")
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(5)
+                continue
+            return []
+    
+    return []
+
 def kill_driver(driver):
     if driver:
         try:
             driver.quit()
         except InvalidSessionIdException:
-            print(f"{Fore.YELLOW} Driver already closed {Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Driver already closed{Style.RESET_ALL}")
         except Exception as e:
+            print(f"{Fore.YELLOW}Error closing driver: {e}{Style.RESET_ALL}")
             kill_process_tree(driver.service.process.pid)
-            
-            
 
 def kill_process_tree(pid):
-    parent = psutil.Process(pid)
-
     try:
-        for child in parent.children:
+        parent = psutil.Process(pid)
+        for child in parent.children(recursive=True):
             child.kill()
         parent.kill()
+    except psutil.NoSuchProcess:
+        pass
     except Exception as e:
-        print(f"{Fore.RED} failed to kill the process_tree{Style.RESET_ALL}")
-
+        print(f"{Fore.RED}Failed to kill process tree: {e}{Style.RESET_ALL}")
 
 def kill_all_instances_of_firefox_and_geckodriver():
-    current_os = platform.system().lower()
-
     try:
-        if current_os == "windows":
-            subprocess.run("cmd", "/c", "taskkill /F /IM firefox.exe")
-            subprocess.run("cmd", "/c", "taskkill /F /IM geckodriver.exe")
-            print(f"{Fore.GREEN} Ran Windows commands. {Style.RESET_ALL}")
-
-        elif current_os == "linux" or current_os == "darwin":
-            subprocess.run("pkill -f firefox", shell=True, check=True)
-            subprocess.run("pkill -f geckodriver", shell=True, check=True)
-            print(f"{Fore.GREEN} Ran Unix commands. {Style.RESET_ALL}")
+        if platform.system().lower() == "windows":
+            os.system("taskkill /f /im firefox.exe >nul 2>&1")
+            os.system("taskkill /f /im geckodriver.exe >nul 2>&1")
         else:
-            print(f"{Fore.RED} OS not supported {Style.RESET_ALL}")
-    except subprocess.CalledProcessError as e:
-        print(f"{Fore.RED}Command failed: {e}{Style.RESET_ALL}")
+            os.system("pkill -f firefox >/dev/null 2>&1")
+            os.system("pkill -f geckodriver >/dev/null 2>&1")
+    except Exception as e:
+        print(f"{Fore.YELLOW}Cleanup warning: {e}{Style.RESET_ALL}")
 
-# if __name__ == "__main__":
-#     print(process_date("23-04-2025"))
-#     get_article_by_year(str(2025))
