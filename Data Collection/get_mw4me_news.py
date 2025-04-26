@@ -73,13 +73,13 @@ def store_data_into_csv(file_name, data):
 
 def get_article_info():
     try:
-        for page in range(961,year_page_map['2015']):
-            result = get_article_by_year_and_page_number(2015, page + 1)
+        for page in range(1463,year_page_map['2016']):
+            result = get_article_by_year_and_page_number(2016, page + 1)
             if result:
                 store_data_into_csv(FILE_PATH, result)
             time.sleep(DELAY_BETWEEN_REQUESTS)  # Delay between pages
 
-        for year in range(2016, 2026):
+        for year in range(2017, 2026):
             print(f"{Fore.BLUE}Processing year: {year}{Style.RESET_ALL}")
             get_article_by_year(str(year))
             time.sleep(DELAY_BETWEEN_REQUESTS)  # Be polite to the server
